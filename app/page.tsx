@@ -299,9 +299,38 @@ export default function HomePage() {
 
       {/* ===== FOOTER ===== */}
       <footer className="border-t mt-auto bg-card/50">
-        <div className="mx-auto max-w-[1600px] px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-          <p>EncontreiBarato - Feito para você economizar na sua compra.</p>
-          <p>Preços podem variar. Consulte o mercado para confirmação.</p>
+        <div className="mx-auto max-w-[1600px] px-4 py-4 flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-1 text-center sm:text-left">
+            <p className="font-medium text-foreground">
+              © 2026 EncontreiBarato
+            </p>
+            <p>Compare preços com mais rapidez e economize nas suas compras.</p>
+          </div>
+
+          <div className="flex flex-col gap-1 text-center sm:text-right">
+            <p>
+              Desenvolvido por{" "}
+              <a
+                href="https://instagram.com/iamduuh_"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-foreground transition-colors hover:text-primary"
+              >
+                Eduardo Mendes
+              </a>
+            </p>
+            <p>
+              Instagram:{" "}
+              <a
+                href="https://instagram.com/iamduuh_"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-primary"
+              >
+                @iamduuh_
+              </a>
+            </p>
+          </div>
         </div>
       </footer>
     </main>
