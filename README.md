@@ -4,6 +4,14 @@ Comparador de preços entre mercados, com foco em busca rápida de produtos, con
 
 O projeto nasceu com um recorte inicial mais regional, mas a proposta do produto é evoluir para um comparador escalável para o Brasil todo, respeitando disponibilidade, CEP, seller e regras específicas de cada mercado.
 
+## Visualização Online
+
+O Encontrei Barato está disponível online para visualização e testes em produção:
+
+[encontreibarato.com.br](https://encontreibarato.com.br)
+
+Se você quiser conhecer a interface, validar o funcionamento da busca ou acompanhar a evolução do produto, essa é a melhor forma de acessar a versão publicada.
+
 ## Visão Geral
 
 O Encontrei Barato foi construído para resolver um problema simples: pesquisar um produto uma vez e comparar, em poucos segundos, quanto ele custa em diferentes mercados.
