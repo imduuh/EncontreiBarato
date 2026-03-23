@@ -3,26 +3,18 @@
  * PAGINA PRINCIPAL - Encontrei Barato
  * =============================================================================
  * Interface principal do comparador de precos.
- * Permite buscar produtos e comparar precos entre diferentes mercados de Bauru.
+ * Permite buscar produtos e comparar precos entre diferentes mercados.
  */
 
 "use client"
 
-import { useState, useCallback } from "react"
+import { useCallback, useState } from "react"
 import { SearchBar } from "@/components/search-bar"
 import { MarketColumn, MarketColumnSkeleton } from "@/components/market-column"
 import { Switch } from "@/components/ui/switch"
-import { MARKETS, type SearchResponse, type MarketProduct } from "@/lib/scrapers/types"
-import { ShoppingCart, Info, TrendingDown } from "lucide-react"
+import { MARKETS, type MarketProduct, type SearchResponse } from "@/lib/scrapers/types"
+import { Info, MapPin, ShoppingCart, TrendingDown } from "lucide-react"
 
-// =============================================================================
-// FUNCOES AUXILIARES
-// =============================================================================
-
-/**
- * Normaliza o nome do produto para comparacao entre mercados.
- * Remove acentos, caracteres especiais e converte para minusculas.
- */
 function normalizeForComparison(name: string): string {
   return name
     .toLowerCase()
@@ -32,34 +24,23 @@ function normalizeForComparison(name: string): string {
     .trim()
 }
 
-/**
- * Calcula o menor preco global para cada produto.
- * Considera tanto o preco normal quanto o preco com desconto por quantidade.
- * 
- * @param data - Resposta da busca com todos os mercados
- * @returns Map com nome normalizado -> menor preco
- */
 function computeGlobalMinPrices(data: SearchResponse): Map<string, number> {
   const priceMap = new Map<string, number>()
 
-  // Coletar todos os produtos de todos os mercados
   for (const result of data.results) {
     if (result.status !== "success") continue
 
     for (const product of result.products) {
-      // Ignorar produtos sem preco
       if (product.price <= 0) continue
 
       const normalized = normalizeForComparison(product.name)
       const existingMin = priceMap.get(normalized)
 
-      // Determinar o menor preco do produto (considerando desconto por quantidade)
       let productMinPrice = product.price
       if (product.bulkPrice && product.bulkPrice.price < productMinPrice) {
         productMinPrice = product.bulkPrice.price
       }
 
-      // Atualizar o menor preco global se necessario
       if (!existingMin || productMinPrice < existingMin) {
         priceMap.set(normalized, productMinPrice)
       }
@@ -69,35 +50,38 @@ function computeGlobalMinPrices(data: SearchResponse): Map<string, number> {
   return priceMap
 }
 
-/**
- * Determina se o produto deve ser tratado como disponivel para exibicao.
- */
 function isProductAvailable(product: MarketProduct): boolean {
   return product.price > 0 || (product.bulkPrice?.price ?? 0) > 0
 }
 
-// =============================================================================
-// COMPONENTE PRINCIPAL
-// =============================================================================
-
 export default function HomePage() {
-  // Estados da aplicacao
   const [data, setData] = useState<SearchResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [showUnavailableProducts, setShowUnavailableProducts] = useState(true)
 
-  /**
-   * Handler de busca - chamado quando o usuario submete uma busca.
-   */
-  const handleSearch = useCallback(async (query: string) => {
+  const handleSearch = useCallback(async ({
+    query,
+    city,
+    state,
+  }: {
+    query: string
+    city: string
+    state: string
+  }) => {
     setIsLoading(true)
     setError(null)
     setHasSearched(true)
 
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
+      const params = new URLSearchParams({
+        q: query,
+        city,
+        state,
+      })
+
+      const res = await fetch(`/api/search?${params.toString()}`)
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({ error: "Erro ao buscar" }))
@@ -127,34 +111,29 @@ export default function HomePage() {
         }
       : data
 
-  // Calcular precos minimos globais para destacar o mais barato
   const globalMinPrices = visibleData ? computeGlobalMinPrices(visibleData) : new Map()
-
-  // Estatisticas de resultados
   const totalProducts = visibleData
     ? visibleData.results.reduce(
-        (sum, r) => sum + (r.status === "success" ? r.products.length : 0),
+        (sum, item) => sum + (item.status === "success" ? item.products.length : 0),
         0
       )
     : 0
 
   const successfulMarkets = visibleData
-    ? visibleData.results.filter((r) => r.status === "success").length
+    ? visibleData.results.filter((item) => item.status === "success").length
     : 0
 
-  // =========================================================================
-  // RENDER
-  // =========================================================================
+  const enabledMarketsCount = visibleData?.region.enabledMarketIds.length ?? MARKETS.length
+  const supportedRegionMessage =
+    visibleData && !visibleData.region.isSupported ? visibleData.region.message : null
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-      {/* ===== HEADER ===== */}
       <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="mx-auto max-w-[1600px] px-4 py-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            {/* Logo e titulo */}
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center size-10 rounded-xl bg-primary shadow-lg shadow-primary/20">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/20">
                 <ShoppingCart className="size-5 text-primary-foreground" />
               </div>
               <div>
@@ -162,13 +141,12 @@ export default function HomePage() {
                   Encontrei Barato
                 </h1>
                 <p className="text-xs text-muted-foreground">
-                  Compare preços entre mercados de Bauru
+                  Compare preços entre mercados com contexto por cidade e estado
                 </p>
               </div>
             </div>
 
-            {/* Barra de busca */}
-            <div className="lg:w-[500px]">
+            <div className="lg:w-[560px]">
               <SearchBar onSearch={handleSearch} isLoading={isLoading} />
             </div>
           </div>
@@ -176,7 +154,7 @@ export default function HomePage() {
           <div className="mt-4 flex items-center justify-end gap-3">
             <label
               htmlFor="show-unavailable-products"
-              className="text-sm font-medium text-muted-foreground cursor-pointer"
+              className="cursor-pointer text-sm font-medium text-muted-foreground"
             >
               Mostrar produtos indisponíveis:
             </label>
@@ -191,48 +169,69 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* ===== CONTEUDO PRINCIPAL ===== */}
       <div className="mx-auto max-w-[1600px] px-4 py-6">
-        {/* Mensagem de erro */}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive mb-6">
+          <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         )}
 
-        {/* Header dos resultados */}
+        {supportedRegionMessage && !isLoading && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {supportedRegionMessage}
+          </div>
+        )}
+
         {visibleData && !isLoading && (
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-6 pb-4 border-b">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="size-4 text-primary" />
-              <p className="text-sm font-medium text-foreground">
-                Resultados para{" "}
-                <span className="text-primary">"{visibleData.query}"</span>
-              </p>
+          <div className="mb-6 flex flex-col gap-3 border-b pb-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingDown className="size-4 text-primary" />
+                <p className="text-sm font-medium text-foreground">
+                  Resultados para{" "}
+                  <span className="text-primary">"{visibleData.query}"</span>
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <MapPin className="size-3.5" />
+                <span>{visibleData.region.label}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <span className="size-2 rounded-full bg-primary/60" />
-                {successfulMarkets} de {MARKETS.length} mercados consultados
+                {successfulMarkets} de {enabledMarketsCount} mercados consultados
               </span>
               <span className="text-muted-foreground/50">|</span>
               <span>{totalProducts} produtos encontrados</span>
+              {!visibleData.region.isSupported && (
+                <>
+                  <span className="text-muted-foreground/50">|</span>
+                  <span>Região ainda sem cobertura ativa</span>
+                </>
+              )}
             </div>
           </div>
         )}
 
-        {/* Grid de loading */}
         {isLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div
+            className="grid gap-4"
+            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}
+          >
             {MARKETS.map((market) => (
               <MarketColumnSkeleton key={market.id} />
             ))}
           </div>
         )}
 
-        {/* Grid de resultados */}
-        {visibleData && !isLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        {visibleData && !isLoading && visibleData.results.length > 0 && (
+          <div
+            className="grid gap-4"
+            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}
+          >
             {visibleData.results.map((result) => (
               <MarketColumn
                 key={result.market.id}
@@ -243,37 +242,35 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Estado inicial (sem busca) */}
         {!hasSearched && !isLoading && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex items-center justify-center size-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 mb-6">
+            <div className="mb-6 flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5">
               <ShoppingCart className="size-10 text-primary" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-3">
+            <h2 className="mb-3 text-2xl font-bold text-foreground">
               Busque um produto para consultar
             </h2>
-            <p className="text-sm text-muted-foreground max-w-lg mb-8 leading-relaxed">
-              Digite o nome de um produto na barra de busca acima.
-              Vamos procurar os preços no Tenda Atacado, Sam{"'"}s Club, Tauste,
-              Confiança e Atacadão.
+            <p className="mb-8 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Digite o nome do produto, escolha sua cidade e o estado para consultar os
+              mercados compatíveis com a sua região. A estrutura já está preparada para
+              expansão nacional, mas a cobertura ativa neste momento ainda está concentrada
+              em Bauru/SP.
             </p>
 
-            {/* Dica de uso */}
-            <div className="flex items-start gap-3 text-sm text-muted-foreground bg-muted/50 rounded-xl px-5 py-4 max-w-lg border">
-              <Info className="size-5 mt-0.5 flex-shrink-0 text-primary" />
+            <div className="flex max-w-2xl items-start gap-3 rounded-xl border bg-muted/50 px-5 py-4 text-sm text-muted-foreground">
+              <Info className="mt-0.5 size-5 flex-shrink-0 text-primary" />
               <p className="text-left leading-relaxed">
-                <strong>Dica:</strong> use termos especificos como{" "}
-                <span className="font-medium text-foreground">"Nutella 650g"</span>{" "}
-                para resultados mais precisos.
+                <strong>Dica:</strong> use termos específicos como{" "}
+                <span className="font-medium text-foreground">"Nutella 650g"</span> para
+                resultados mais precisos.
               </p>
             </div>
 
-            {/* Mercados disponiveis */}
             <div className="mt-10 flex flex-wrap justify-center gap-3">
               {MARKETS.map((market) => (
                 <div
                   key={market.id}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full border bg-card text-xs font-medium"
+                  className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs font-medium"
                 >
                   <span
                     className="size-2 rounded-full"
@@ -286,24 +283,22 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Estado sem resultados */}
-        {visibleData && !isLoading && totalProducts === 0 && (
+        {visibleData && !isLoading && visibleData.results.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <PackageOpen className="size-12 text-muted-foreground/50 mb-4" />
+            <PackageOpen className="mb-4 size-12 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">
-              Nenhum produto encontrado para essa busca. Tente termos diferentes.
+              {visibleData.region.isSupported
+                ? "Nenhum produto encontrado para essa busca. Tente termos diferentes."
+                : visibleData.region.message}
             </p>
           </div>
         )}
       </div>
 
-      {/* ===== FOOTER ===== */}
-      <footer className="border-t mt-auto bg-card/50">
-        <div className="mx-auto max-w-[1600px] px-4 py-4 flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <footer className="mt-auto border-t bg-card/50">
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-3 px-4 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-1 text-center sm:text-left">
-            <p className="font-medium text-foreground">
-              © 2026 EncontreiBarato
-            </p>
+            <p className="font-medium text-foreground">© 2026 EncontreiBarato</p>
             <p>Compare preços com mais rapidez e economize nas suas compras.</p>
           </div>
 
@@ -337,7 +332,6 @@ export default function HomePage() {
   )
 }
 
-// Componente auxiliar para o estado vazio
 function PackageOpen({ className }: { className?: string }) {
   return (
     <svg

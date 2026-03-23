@@ -21,7 +21,7 @@
 import * as cheerio from "cheerio"
 import type { AnyNode } from "domhandler"
 import logger from "./logger"
-import type { BulkPrice, MarketProduct } from "./types"
+import type { BulkPrice, MarketProduct, ScraperContext } from "./types"
 
 // Constantes de configuracao
 const MARKET_NAME = "Tenda"
@@ -46,7 +46,7 @@ const BROWSER_HEADERS: Record<string, string> = {
  * @param query - Termo de busca (ex: "arroz", "feijao")
  * @returns Lista de produtos encontrados (maximo 10)
  */
-export async function scrapeTenda(query: string): Promise<MarketProduct[]> {
+export async function scrapeTenda(query: string, _context?: ScraperContext): Promise<MarketProduct[]> {
   const searchUrl = `${BASE_URL}/busca?q=${encodeURIComponent(query)}`
   
   logger.info(MARKET_NAME, "Iniciando busca", { query })

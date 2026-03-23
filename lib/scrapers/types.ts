@@ -1,3 +1,5 @@
+import type { SearchRegion } from "@/lib/regions"
+
 /**
  * =============================================================================
  * TIPOS E INTERFACES PARA O COMPARADOR DE PRECOS
@@ -63,6 +65,13 @@ export interface MarketInfo {
  */
 export const MARKETS: MarketInfo[] = [
   {
+    id: "barracao",
+    name: "Barracao",
+    color: "#16833B",
+    url: "https://www.barracaosm.com.br",
+    logo: "/markets/barracao.svg",
+  },
+  {
     id: "tenda",
     name: "Tenda Atacado",
     color: "#E31E24",        // Vermelho Tenda
@@ -106,5 +115,10 @@ export const MARKETS: MarketInfo[] = [
 export interface SearchResponse {
   query: string              // Termo buscado pelo usuario
   results: MarketResult[]    // Resultados de cada mercado
+  region: SearchRegion       // Contexto regional da busca
   timestamp: string          // Timestamp ISO da busca
+}
+
+export interface ScraperContext {
+  region: SearchRegion
 }

@@ -12,6 +12,7 @@ import chalk from "chalk"
  * Cores associadas a cada mercado para facilitar identificacao nos logs.
  */
 const MARKET_COLORS: Record<string, (text: string) => string> = {
+  barracao: chalk.hex("#16833B"),
   tenda: chalk.red,
   samsclub: chalk.blue,
   tauste: chalk.hex("#ed5e1c"),  // Laranja

@@ -22,7 +22,7 @@
  */
 
 import logger from "./logger"
-import type { MarketProduct, BulkPrice } from "./types"
+import type { MarketProduct, BulkPrice, ScraperContext } from "./types"
 
 // ============================================================================
 // CONSTANTES E CONFIGURACAO
@@ -56,12 +56,12 @@ const BROWSER_HEADERS: Record<string, string> = {
  * @param query - Termo de busca
  * @returns Lista de produtos encontrados
  */
-export async function scrapeAtacadao(query: string): Promise<MarketProduct[]> {
+export async function scrapeAtacadao(query: string, context?: ScraperContext): Promise<MarketProduct[]> {
   logger.info(MARKET_NAME, "Iniciando busca", { query })
 
   try {
     // Passo 1: Configurar sessao com CEP de Bauru
-    const sessionCookies = await setupSession()
+    const sessionCookies = await setupSession(context)
 
     // Passo 2: Buscar produtos usando as APIs disponiveis
     const products = await searchProducts(query, sessionCookies)
@@ -91,8 +91,10 @@ export async function scrapeAtacadao(query: string): Promise<MarketProduct[]> {
  * 
  * @returns String com cookies para usar nas requisicoes
  */
-async function setupSession(): Promise<string> {
-  logger.info(MARKET_NAME, "Configurando sessao", { cep: DEFAULT_CEP })
+async function setupSession(context?: ScraperContext): Promise<string> {
+  const cep = context?.region.referenceCep || DEFAULT_CEP
+
+  logger.info(MARKET_NAME, "Configurando sessao", { cep })
 
   const cookies: string[] = []
 
@@ -112,7 +114,7 @@ async function setupSession(): Promise<string> {
     // 2. Configurar localizacao via API de sessao do VTEX
     const sessionPayload = {
       public: {
-        postalCode: { value: DEFAULT_CEP },
+        postalCode: { value: cep },
         country: { value: "BRA" },
         geoCoordinates: { value: null },
       },
@@ -149,7 +151,7 @@ async function setupSession(): Promise<string> {
     currencyCode: "BRL",
     currencySymbol: "R$",
     countryCode: "BRA",
-    postalCode: DEFAULT_CEP,
+    postalCode: cep,
     regionId: null,
     cultureInfo: "pt-BR",
     channelPrivacy: "public",

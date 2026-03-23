@@ -2,7 +2,7 @@
 
 Comparador de preços entre mercados, com foco em busca rápida de produtos, consolidação visual por loja e suporte a preços promocionais por quantidade.
 
-O projeto nasceu com um recorte inicial mais regional, mas a proposta do produto é evoluir para um comparador escalável para o Brasil todo, respeitando disponibilidade, CEP, seller e regras específicas de cada mercado.
+O projeto nasceu com um recorte inicial regional, mas a proposta do produto é evoluir para um comparador escalável para o Brasil todo, respeitando disponibilidade, cidade, CEP de referência, seller e regras específicas de cada mercado.
 
 ## Visualização Online
 
@@ -12,12 +12,19 @@ O Encontrei Barato está disponível online para visualização e testes em prod
 
 Se você quiser conhecer a interface, validar o funcionamento da busca ou acompanhar a evolução do produto, essa é a melhor forma de acessar a versão publicada.
 
+## Versão Atual
+
+- Versão: `1.1.0`
+- Última release documentada: `2026-03-23`
+- Histórico completo: [CHANGELOG.md](CHANGELOG.md)
+
 ## Visão Geral
 
 O Encontrei Barato foi construído para resolver um problema simples: pesquisar um produto uma vez e comparar, em poucos segundos, quanto ele custa em diferentes mercados.
 
 Hoje o sistema consulta:
 
+- Barracão
 - Tenda Atacado
 - Sam's Club
 - Tauste
@@ -34,8 +41,39 @@ Cada mercado tem um scraper próprio, porque cada site usa estrutura, API, HTML,
 - Mostra preços promocionais por quantidade quando disponíveis
 - Permite ocultar produtos indisponíveis na interface
 - Usa cache em memória para reduzir repetição de requisições
+- Deduplica buscas idênticas em andamento
+- Aplica timeout por mercado para evitar esperas excessivas
 - Mantém logs detalhados para diagnóstico dos scrapers
 - Trata divergências entre busca, página do produto e disponibilidade regional
+
+## Busca Regional
+
+Na versão `1.1.0`, o projeto passou a trabalhar com contexto regional de busca.
+
+Hoje a API recebe:
+
+- `q`
+- `city`
+- `state`
+
+Além disso:
+
+- a interface mostra apenas estados e cidades cadastrados em [lib/regions.ts](lib/regions.ts)
+- a arquitetura já está pronta para expansão para novas cidades
+- neste momento, a cobertura ativa depende da combinação entre cidade e mercados habilitados
+
+Localidades atualmente habilitadas:
+
+- Bauru/SP
+- Jaú/SP
+- Pederneiras/SP
+- Potunduva/SP
+- Arealva/SP
+
+Observação importante:
+
+- nem todos os mercados estão disponíveis em todas as cidades
+- a disponibilidade efetiva depende da configuração de [lib/regions.ts](lib/regions.ts) e do comportamento de cada scraper
 
 ## Stack
 
@@ -46,7 +84,7 @@ Cada mercado tem um scraper próprio, porque cada site usa estrutura, API, HTML,
 - Radix UI / componentes no estilo shadcn
 - Cheerio para parsing HTML
 
-## Estrutura do projeto
+## Estrutura do Projeto
 
 ```text
 app/
@@ -61,8 +99,10 @@ components/
   ui/                        # componentes reutilizáveis de interface
 
 lib/
+  regions.ts                 # localidades suportadas e contexto regional
   scrapers/
     atacadao.ts              # scraper do Atacadão
+    barracao.ts              # scraper do Barracão
     confianca.ts             # scraper do Confiança
     samsclub.ts              # scraper do Sam's Club
     tauste.ts                # scraper do Tauste
@@ -75,24 +115,26 @@ hooks/
 styles/
 ```
 
-## Como funciona a busca
+## Como Funciona a Busca
 
 O fluxo principal é este:
 
-1. O usuário digita um produto na página inicial.
-2. A interface chama `GET /api/search?q=...`.
-3. A API valida o termo e verifica o cache.
-4. Se não houver cache válido, os scrapers são executados em paralelo.
-5. Cada scraper transforma o retorno do mercado em um formato comum.
-6. A API agrega os resultados e devolve uma resposta única.
-7. A interface renderiza os produtos por mercado e destaca os melhores preços.
+1. O usuário informa um produto, cidade e estado na página inicial.
+2. A interface chama `GET /api/search?q=...&city=...&state=...`.
+3. A API valida o termo e resolve a região em [lib/regions.ts](lib/regions.ts).
+4. A API verifica cache por `query + cidade + estado`.
+5. Se não houver cache válido, apenas os scrapers habilitados para aquela localidade são executados.
+6. Os mercados são consultados em paralelo com `Promise.allSettled`.
+7. Cada scraper transforma o retorno do mercado em um formato comum.
+8. A API agrega os resultados e devolve uma resposta única.
+9. A interface renderiza os produtos por mercado e destaca os melhores preços.
 
-## API principal
+## API Principal
 
 Endpoint:
 
 ```http
-GET /api/search?q=nutella%20650g
+GET /api/search?q=nutella%20650g&city=Bauru&state=SP
 ```
 
 Arquivo:
@@ -101,18 +143,29 @@ Arquivo:
 
 ### Regras da API
 
-- aceita o parâmetro `q`
-- exige mínimo de 3 caracteres
+- aceita os parâmetros `q`, `city` e `state`
+- exige mínimo de 3 caracteres em `q`
 - aceita no máximo 100 caracteres
 - faz cache em memória por 15 minutos
-- executa todos os mercados com `Promise.allSettled`
+- deduplica buscas idênticas em andamento
+- executa os mercados habilitados em paralelo
+- aplica timeout por mercado
 - a falha de um mercado não derruba os outros
 
-### Exemplo de resposta
+### Exemplo de Resposta
 
 ```json
 {
   "query": "nutella 650g",
+  "region": {
+    "key": "bauru-sp",
+    "label": "Bauru, SP",
+    "city": "Bauru",
+    "state": "SP",
+    "isSupported": true,
+    "referenceCep": "17014900",
+    "enabledMarketIds": ["barracao", "tenda", "samsclub", "tauste", "confianca", "atacadao"]
+  },
   "results": [
     {
       "market": {
@@ -139,14 +192,14 @@ Arquivo:
         }
       ],
       "status": "success",
-      "searchedAt": "2026-03-19T16:00:00.000Z"
+      "searchedAt": "2026-03-23T16:00:00.000Z"
     }
   ],
-  "timestamp": "2026-03-19T16:00:00.000Z"
+  "timestamp": "2026-03-23T16:00:00.000Z"
 }
 ```
 
-## Modelo de dados
+## Modelo de Dados
 
 Os tipos compartilhados ficam em:
 
@@ -173,7 +226,7 @@ Representa um preço unitário promocional condicionado a quantidade mínima:
 - `priceFormatted`
 - `description?`
 
-## Como os scrapers funcionam
+## Como os Scrapers Funcionam
 
 Cada mercado tem um arquivo próprio em [lib/scrapers](lib/scrapers).
 
@@ -183,6 +236,20 @@ O objetivo de cada scraper é sempre o mesmo:
 - extrair nome, imagem, URL e preço
 - detectar promoções por quantidade
 - devolver tudo no formato `MarketProduct[]`
+
+### Barracão
+
+Arquivo:
+
+[lib/scrapers/barracao.ts](lib/scrapers/barracao.ts)
+
+Características principais:
+
+- usa o catálogo real da loja via `filial/1` e `centro_distribuicao/1`
+- suporta contexto regional dentro da arquitetura do projeto
+- interpreta preços promocionais a partir de `oferta.preco_oferta`
+- monta URLs de produto no formato `/produto/{produto_id}/{slug}`
+- usa imagens hospedadas no bucket de assets da plataforma
 
 ### Atacadão
 
@@ -244,7 +311,7 @@ Características principais:
 - scraper dedicado ao HTML/estrutura do mercado
 - normalização para o formato unificado do app
 
-## Logs e observabilidade
+## Logs e Observabilidade
 
 Os logs estão centralizados em:
 
@@ -281,7 +348,9 @@ Os principais componentes visuais são:
 Recursos da UI:
 
 - busca centralizada no header
-- colunas por mercado
+- seleção de estado e cidade a partir das localidades suportadas
+- Bauru como localidade padrão
+- colunas por mercado com layout mais escalável
 - destaque do menor preço global
 - exibição de preço de atacado em separado
 - filtro para produtos indisponíveis
@@ -293,7 +362,7 @@ Recursos da UI:
 - Node.js 18 ou superior
 - npm
 
-### Passo a passo
+### Passo a Passo
 
 ```bash
 git clone https://github.com/imduuh/EncontreiBarato.git
@@ -301,7 +370,7 @@ cd encontreibarato
 npm install
 ```
 
-### Rodando em desenvolvimento
+### Rodando em Desenvolvimento
 
 ```bash
 npm run dev
@@ -311,7 +380,7 @@ Depois abra:
 
 [http://localhost:3000](http://localhost:3000)
 
-### Build de produção
+### Build de Produção
 
 ```bash
 npm run build
@@ -329,7 +398,7 @@ Contribuições são bem-vindas, principalmente em:
 - melhorias de performance e cache
 - expansão do projeto para novas cidades, regiões e mercados
 
-### Fluxo sugerido
+### Fluxo Sugerido
 
 1. crie uma branch para sua alteração
 2. implemente a mudança
@@ -337,31 +406,31 @@ Contribuições são bem-vindas, principalmente em:
 4. revise os logs dos scrapers
 5. abra um pull request descrevendo o problema e a solução
 
-### Boas práticas para contribuir com scrapers
+### Boas Práticas para Contribuir com Scrapers
 
 - preserve o formato de retorno `MarketProduct`
 - prefira adicionar fallback em vez de substituir a estratégia anterior
 - trate indisponibilidade e preço zerado com cuidado
 - registre casos importantes de divergência
 - considere que busca, PDP e checkout podem discordar entre si
-- lembre que disponibilidade pode variar por CEP, loja, seller e sessão
+- lembre que disponibilidade pode variar por cidade, CEP, loja, seller e sessão
 
-## Limites e observações importantes
+## Limites e Observações Importantes
 
 - os mercados podem mudar HTML, endpoints e regras a qualquer momento
-- disponibilidade e preço podem variar por CEP, loja, seller e sessão
+- disponibilidade e preço podem variar por cidade, CEP, loja, seller e sessão
 - o projeto depende de scraping e integrações não oficiais
 - parte dos dados pode ficar temporariamente inconsistente quando o mercado diverge entre busca e PDP
 - o cache em memória é local ao processo e não compartilhado entre instâncias
 
-## Roadmap sugerido
+## Roadmap Sugerido
 
 - cache persistente
 - testes automatizados para parsers críticos
 - observabilidade mais estruturada para falhas de scraper
 - identificação mais forte de equivalência entre produtos
 - suporte a mais mercados
-- suporte a mais regiões e CEPs no Brasil
+- suporte a mais regiões e cidades no Brasil
 
 ## Licença
 

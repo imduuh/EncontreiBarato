@@ -17,7 +17,7 @@
  */
 
 import logger from "./logger"
-import type { MarketProduct } from "./types"
+import type { MarketProduct, ScraperContext } from "./types"
 
 // ============================================================================
 // CONSTANTES E CONFIGURACAO
@@ -93,7 +93,7 @@ interface IntelligentSearchProduct {
  * @param query - Termo de busca
  * @returns Lista de produtos encontrados
  */
-export async function scrapeSamsClub(query: string): Promise<MarketProduct[]> {
+export async function scrapeSamsClub(query: string, _context?: ScraperContext): Promise<MarketProduct[]> {
   logger.info(MARKET_NAME, "Iniciando busca", { query })
 
   // Estrategia 1: VTEX Catalog API

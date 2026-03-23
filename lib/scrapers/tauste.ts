@@ -21,7 +21,7 @@
 import * as cheerio from "cheerio"
 import type { Element } from "domhandler"
 import logger from "./logger"
-import type { MarketProduct } from "./types"
+import type { MarketProduct, ScraperContext } from "./types"
 
 // ============================================================================
 // CONSTANTES E CONFIGURACAO
@@ -55,7 +55,7 @@ const BROWSER_HEADERS: Record<string, string> = {
  * @param query - Termo de busca
  * @returns Lista de produtos encontrados
  */
-export async function scrapeTauste(query: string): Promise<MarketProduct[]> {
+export async function scrapeTauste(query: string, _context?: ScraperContext): Promise<MarketProduct[]> {
   // URL de busca do Magento 2
   const searchUrl = `${BASE_URL}${STORE_PATH}/catalogsearch/result/?q=${encodeURIComponent(query)}`
   

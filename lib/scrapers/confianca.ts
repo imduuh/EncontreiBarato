@@ -29,7 +29,7 @@
  */
 
 import logger from "./logger"
-import type { MarketProduct } from "./types"
+import type { MarketProduct, ScraperContext } from "./types"
 
 // ============================================================================
 // CONSTANTES E CONFIGURACAO
@@ -61,7 +61,7 @@ const API_HEADERS: Record<string, string> = {
  * @param query - Termo de busca
  * @returns Lista de produtos encontrados
  */
-export async function scrapeConfianca(query: string): Promise<MarketProduct[]> {
+export async function scrapeConfianca(query: string, _context?: ScraperContext): Promise<MarketProduct[]> {
   // URL da API OCC com parametros de busca
   // Ns=product.analytics.factorQuantitySold30d|1 ordena por mais vendidos
   const apiUrl = `${BASE_URL}/ccstore/v1/search?Ntt=${encodeURIComponent(query)}&Nrpp=16&Ns=product.analytics.factorQuantitySold30d|1`
