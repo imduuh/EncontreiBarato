@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.2.0] - 2026-04-02
+
+### Adicionado
+
+- Coleta persistente de métricas da API de busca com SQLite
+- Dashboard administrativo privado em [app/admin/metrics/page.tsx](app/admin/metrics/page.tsx)
+- Proteção da área `/admin` com autenticação básica via variáveis de ambiente
+- Métricas de latência com percentis `p50`, `p90`, `p95` e `p99`
+- Métricas de throughput com `RPS` em janelas recentes
+- Métricas de cache com `hit rate`, `miss rate` e reaproveitamento de requisições em andamento
+- Métricas por mercado com sucesso, erro, timeout, latência média e volume médio de produtos
+- Persistência local do banco em SQLite fora do versionamento
+- Arquivo [.env.example](.env.example) com as variáveis necessárias para a área administrativa
+
+### Alterado
+
+- A API de busca agora registra automaticamente cada execução e cada scraper no banco de métricas
+- O projeto agora usa a versão `1.2.0`
+- O `.gitignore` foi corrigido e passou a ignorar a pasta local `data/`
+
+### Observações
+
+- As métricas ficam disponíveis apenas para acesso autenticado na área administrativa
+- O uptime exibido no dashboard representa o tempo de vida do processo atual da aplicação
+- O histórico de métricas é local à instância onde o SQLite está rodando
+
 ## [1.1.0] - 2026-03-23
 
 ### Adicionado
@@ -36,7 +62,3 @@
 - A cobertura ativa agora depende da combinação entre cidade e mercados habilitados
 - Novas cidades podem ser habilitadas adicionando localidades suportadas e evoluindo os scrapers correspondentes
 - Nos testes atuais do Barracão, o mesmo catálogo e os mesmos preços responderam para os CEPs de Bauru, Jaú, Pederneiras e Arealva
-
-### Release
-
-- Bump de versão do projeto para `1.1.0`

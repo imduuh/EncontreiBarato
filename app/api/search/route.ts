@@ -18,17 +18,22 @@ import { scrapeSamsClub } from "@/lib/scrapers/samsclub"
 import { scrapeTauste } from "@/lib/scrapers/tauste"
 import { scrapeConfianca } from "@/lib/scrapers/confianca"
 import { scrapeAtacadao } from "@/lib/scrapers/atacadao"
+import { recordSearchMetric, summarizeSearchResults, type ScraperMetricInput } from "@/lib/metrics/service"
 import logger from "@/lib/scrapers/logger"
 import { MARKETS, type MarketResult, type ScraperContext, type SearchResponse } from "@/lib/scrapers/types"
 
 const cache = new Map<string, { data: SearchResponse; timestamp: number }>()
-const inFlightRequests = new Map<string, Promise<SearchResponse>>()
+const inFlightRequests = new Map<string, Promise<SearchExecution>>()
 
 const CACHE_TTL = 15 * 60 * 1000
 const MAX_CACHE_ENTRIES = 100
 const SCRAPER_TIMEOUT_MS = 12000
 
 type ScraperFn = (query: string, context: ScraperContext) => Promise<MarketResult["products"]>
+type SearchExecution = {
+  response: SearchResponse
+  scraperRuns: ScraperMetricInput[]
+}
 
 const scrapers: Array<{ marketId: string; fn: ScraperFn }> = [
   { marketId: "barracao", fn: scrapeBarracao },
@@ -40,6 +45,7 @@ const scrapers: Array<{ marketId: string; fn: ScraperFn }> = [
 ]
 
 export async function GET(request: NextRequest) {
+  const startedAt = performance.now()
   const query = request.nextUrl.searchParams.get("q")?.trim()
   const city = request.nextUrl.searchParams.get("city")?.trim() || "Bauru"
   const state = request.nextUrl.searchParams.get("state")?.trim().toUpperCase() || "SP"
@@ -80,52 +86,107 @@ export async function GET(request: NextRequest) {
 
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     logger.info("API", "Retornando resultado do cache", { query, region: region.label })
+    const cachedSummary = summarizeSearchResults(cached.data.results)
+    recordSearchMetric({
+      query,
+      city,
+      state,
+      region,
+      latencyMs: performance.now() - startedAt,
+      status: "success",
+      totalProducts: cachedSummary.totalProducts,
+      enabledMarketsCount: region.enabledMarketIds.length,
+      successfulMarketsCount: cachedSummary.successfulMarketsCount,
+      errorMarketsCount: cachedSummary.errorMarketsCount,
+      cacheHit: true,
+      cacheMiss: false,
+      inFlightReused: false,
+    })
     return NextResponse.json(cached.data)
   }
 
   const existingRequest = inFlightRequests.get(cacheKey)
   if (existingRequest) {
     logger.info("API", "Reaproveitando busca em andamento", { query, region: region.label })
-    return NextResponse.json(await existingRequest)
+    const sharedExecution = await existingRequest
+    const sharedSummary = summarizeSearchResults(sharedExecution.response.results)
+    recordSearchMetric({
+      query,
+      city,
+      state,
+      region,
+      latencyMs: performance.now() - startedAt,
+      status: "success",
+      totalProducts: sharedSummary.totalProducts,
+      enabledMarketsCount: region.enabledMarketIds.length,
+      successfulMarketsCount: sharedSummary.successfulMarketsCount,
+      errorMarketsCount: sharedSummary.errorMarketsCount,
+      cacheHit: false,
+      cacheMiss: true,
+      inFlightReused: true,
+    })
+    return NextResponse.json(sharedExecution.response)
   }
 
-  const searchPromise = buildSearchResponse(query, region)
+  const searchPromise = buildSearchExecution(query, region)
 
   inFlightRequests.set(cacheKey, searchPromise)
 
   try {
-    const responseData = await searchPromise
-    cache.set(cacheKey, { data: responseData, timestamp: Date.now() })
+    const execution = await searchPromise
+    cache.set(cacheKey, { data: execution.response, timestamp: Date.now() })
     pruneCache()
-    return NextResponse.json(responseData)
+    const summary = summarizeSearchResults(execution.response.results)
+    recordSearchMetric({
+      query,
+      city,
+      state,
+      region,
+      latencyMs: performance.now() - startedAt,
+      status: "success",
+      totalProducts: summary.totalProducts,
+      enabledMarketsCount: region.enabledMarketIds.length,
+      successfulMarketsCount: summary.successfulMarketsCount,
+      errorMarketsCount: summary.errorMarketsCount,
+      cacheHit: false,
+      cacheMiss: true,
+      inFlightReused: false,
+      scraperRuns: execution.scraperRuns,
+    })
+    return NextResponse.json(execution.response)
   } finally {
     inFlightRequests.delete(cacheKey)
   }
 }
 
-async function buildSearchResponse(
+async function buildSearchExecution(
   query: string,
   region: ReturnType<typeof resolveSearchRegion>
-): Promise<SearchResponse> {
+): Promise<SearchExecution> {
   logger.info("API", "Iniciando busca", { query, region: region.label })
 
   if (!region.isSupported) {
     logger.warn("API", "Regiao ainda nao suportada", { region: region.label })
 
     return {
-      query,
-      region,
-      results: [],
-      timestamp: new Date().toISOString(),
+      response: {
+        query,
+        region,
+        results: [],
+        timestamp: new Date().toISOString(),
+      },
+      scraperRuns: [],
     }
   }
 
   const enabledScrapers = scrapers.filter(({ marketId }) => region.enabledMarketIds.includes(marketId))
   const context: ScraperContext = { region }
+  const scraperMetrics: ScraperMetricInput[] = []
 
   const settledResults = await Promise.allSettled(
     enabledScrapers.map(async ({ marketId, fn }) => {
       const market = MARKETS.find((entry) => entry.id === marketId)!
+      const scraperStartedAt = performance.now()
 
       try {
         const products = await withTimeout(
@@ -134,6 +195,15 @@ async function buildSearchResponse(
           `Tempo limite excedido ao consultar ${market.name}.`
         )
 
+        scraperMetrics.push({
+          marketId,
+          marketName: market.name,
+          status: "success",
+          latencyMs: performance.now() - scraperStartedAt,
+          productCount: products.length,
+          timeout: false,
+        })
+
         return {
           market,
           products,
@@ -141,6 +211,16 @@ async function buildSearchResponse(
           searchedAt: new Date().toISOString(),
         }
       } catch (error) {
+        scraperMetrics.push({
+          marketId,
+          marketName: market.name,
+          status: "error",
+          latencyMs: performance.now() - scraperStartedAt,
+          productCount: 0,
+          timeout: error instanceof Error && error.message.includes("Tempo limite excedido"),
+          errorMessage: error instanceof Error ? error.message : "Erro desconhecido",
+        })
+
         return {
           market,
           products: [],
@@ -179,10 +259,13 @@ async function buildSearchResponse(
   })
 
   return {
-    query,
-    region,
-    results,
-    timestamp: new Date().toISOString(),
+    response: {
+      query,
+      region,
+      results,
+      timestamp: new Date().toISOString(),
+    },
+    scraperRuns: scraperMetrics,
   }
 }
 
