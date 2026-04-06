@@ -4,13 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { MapPin, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import {
-  getSupportedCitiesByState,
-  getSupportedStates,
-} from "@/lib/regions"
+import { getSupportedLocationsByState, getSupportedStates } from "@/lib/regions"
 
 interface SearchBarProps {
-  onSearch: (params: { query: string; city: string; state: string }) => void
+  onSearch: (params: { query: string; city: string; state: string; locationKey: string }) => void
   isLoading: boolean
 }
 
@@ -21,35 +18,38 @@ function getDefaultState(): string {
 }
 
 function getDefaultCity(state: string): string {
-  const cities = getSupportedCitiesByState(state)
-  return cities.includes("Bauru") ? "Bauru" : (cities[0] || "")
+  const locations = getSupportedLocationsByState(state)
+  const bauruLocation = locations.find((location) => location.city === "Bauru")
+  return bauruLocation?.city || locations[0]?.city || ""
 }
 
 export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
   const [query, setQuery] = useState("")
   const [state, setState] = useState(getDefaultState)
-  const supportedCities = useMemo(() => getSupportedCitiesByState(state), [state])
+  const supportedLocations = useMemo(() => getSupportedLocationsByState(state), [state])
   const [city, setCity] = useState(() => getDefaultCity(getDefaultState()))
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!supportedCities.includes(city)) {
+    if (!supportedLocations.some((location) => location.city === city)) {
       setCity(getDefaultCity(state))
     }
-  }, [city, state, supportedCities])
+  }, [city, state, supportedLocations])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
     const trimmedQuery = query.trim()
-    const trimmedCity = city.trim()
     const trimmedState = state.trim().toUpperCase()
+    const selectedLocation =
+      supportedLocations.find((location) => location.city === city) || supportedLocations[0]
 
-    if (trimmedQuery.length >= 3 && trimmedCity && trimmedState.length === 2) {
+    if (trimmedQuery.length >= 3 && selectedLocation && trimmedState.length === 2) {
       onSearch({
         query: trimmedQuery,
-        city: trimmedCity,
+        city: selectedLocation.city,
         state: trimmedState,
+        locationKey: selectedLocation.key,
       })
     }
   }
@@ -73,7 +73,7 @@ export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
         <Button
           type="submit"
           size="lg"
-          disabled={isLoading || query.trim().length < 3 || city.trim().length < 2}
+          disabled={isLoading || query.trim().length < 3 || !city}
         >
           {isLoading ? "Buscando..." : "Comparar"}
         </Button>
@@ -85,13 +85,13 @@ export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
           <select
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            disabled={isLoading || supportedCities.length === 0}
+            disabled={isLoading || supportedLocations.length === 0}
             className="h-10 w-full rounded-lg border border-input bg-transparent pl-10 pr-3 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50"
             aria-label="Cidade"
           >
-            {supportedCities.map((supportedCity) => (
-              <option key={supportedCity} value={supportedCity}>
-                {supportedCity}
+            {supportedLocations.map((location) => (
+              <option key={location.key} value={location.city}>
+                {location.city}
               </option>
             ))}
           </select>

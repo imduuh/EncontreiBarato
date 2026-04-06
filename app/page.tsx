@@ -8,12 +8,26 @@
 
 "use client"
 
-import { useCallback, useState } from "react"
+import Image from "next/image"
+import { useCallback, useEffect, useState } from "react"
 import { SearchBar } from "@/components/search-bar"
 import { MarketColumn, MarketColumnSkeleton } from "@/components/market-column"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { MARKETS, type MarketProduct, type SearchResponse } from "@/lib/scrapers/types"
-import { Info, MapPin, ShoppingCart, TrendingDown } from "lucide-react"
+import { Copy, HeartHandshake, Info, MapPin, ShoppingCart, TrendingDown } from "lucide-react"
+
+const DONATION_PIX_DESCRIPTION = "Doação Encontrei Barato"
+const DONATION_PIX_CODE =
+  "00020126360014BR.GOV.BCB.PIX0114+55149970408105204000053039865802BR5901N6001C62190515ENCONTREIBARATO63046C03"
 
 function normalizeForComparison(name: string): string {
   return name
@@ -60,15 +74,37 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [showUnavailableProducts, setShowUnavailableProducts] = useState(true)
+  const [isDonationDialogOpen, setIsDonationDialogOpen] = useState(false)
+  const [pixCopied, setPixCopied] = useState(false)
+
+  useEffect(() => {
+    setIsDonationDialogOpen(true)
+  }, [])
+
+  const handleDonationDialogChange = useCallback((open: boolean) => {
+    setIsDonationDialogOpen(open)
+  }, [])
+
+  const handleCopyPixCode = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(DONATION_PIX_CODE)
+      setPixCopied(true)
+      window.setTimeout(() => setPixCopied(false), 2500)
+    } catch {
+      setPixCopied(false)
+    }
+  }, [])
 
   const handleSearch = useCallback(async ({
     query,
     city,
     state,
+    locationKey,
   }: {
     query: string
     city: string
     state: string
+    locationKey: string
   }) => {
     setIsLoading(true)
     setError(null)
@@ -79,6 +115,7 @@ export default function HomePage() {
         q: query,
         city,
         state,
+        locationKey,
       })
 
       const res = await fetch(`/api/search?${params.toString()}`)
@@ -129,6 +166,74 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted/30">
+      <Dialog open={isDonationDialogOpen} onOpenChange={handleDonationDialogChange}>
+        <DialogContent className="max-w-lg gap-5 p-0 overflow-hidden">
+          <div className="bg-gradient-to-br from-emerald-500/15 via-background to-primary/10 px-6 py-6">
+            <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-700">
+              <HeartHandshake className="size-6" />
+            </div>
+
+            <DialogHeader className="gap-3">
+              <DialogTitle className="text-xl leading-tight">
+                Apoie o Encontrei Barato, se fizer sentido para você.
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+                Este site é mantido de forma voluntária, sem publicidade e sem gerar
+                receita. Se ele te ajuda no dia a dia e você quiser colaborar, qualquer
+                apoio será muito bem-vindo, mas isso não é obrigatório.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="px-6 pb-6">
+            <div className="rounded-2xl border bg-muted/40 p-4">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                QR Code do PIX
+              </p>
+              <div className="mt-3 flex justify-center">
+                <div className="overflow-hidden rounded-2xl border bg-background p-3 shadow-sm">
+                  <Image
+                    src="/images/pix-doacao-encontrei-barato.png"
+                    alt="QR Code do PIX para apoiar o Encontrei Barato"
+                    width={220}
+                    height={220}
+                    className="h-auto w-[220px]"
+                    priority
+                  />
+                </div>
+              </div>
+              <p className="mt-3 text-center text-sm font-medium text-foreground">
+                {DONATION_PIX_DESCRIPTION}
+              </p>
+              <p className="mt-1 text-center text-xs leading-relaxed text-muted-foreground">
+                Se quiser contribuir, basta escanear o QR Code acima no app do seu banco.
+              </p>
+
+              <div className="mt-4 rounded-xl border bg-background p-3">
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  Código PIX
+                </p>
+                <p className="mt-2 break-all font-mono text-xs leading-relaxed text-foreground">
+                  {DONATION_PIX_CODE}
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="mt-5 -mx-0 -mb-0 rounded-2xl border-0 bg-transparent p-0 sm:justify-end">
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={handleCopyPixCode}>
+                  <Copy className="size-4" />
+                  {pixCopied ? "Código copiado" : "Copiar código PIX"}
+                </Button>
+                <Button variant="outline" onClick={() => handleDonationDialogChange(false)}>
+                  Fechar
+                </Button>
+              </div>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="mx-auto max-w-[1600px] px-4 py-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -252,9 +357,8 @@ export default function HomePage() {
             </h2>
             <p className="mb-8 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               Digite o nome do produto, escolha sua cidade e o estado para consultar os
-              mercados compatíveis com a sua região. A estrutura já está preparada para
-              expansão nacional, mas a cobertura ativa neste momento ainda está concentrada
-              em Bauru/SP.
+              mercados compatíveis com a sua região. Em cidades com múltiplas unidades,
+              usamos uma loja de referência interna para manter a busca simples e organizada.
             </p>
 
             <div className="flex max-w-2xl items-start gap-3 rounded-xl border bg-muted/50 px-5 py-4 text-sm text-muted-foreground">

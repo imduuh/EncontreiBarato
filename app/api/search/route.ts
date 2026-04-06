@@ -3,7 +3,7 @@
  * API DE BUSCA DE PRODUTOS
  * =============================================================================
  *
- * Endpoint: GET /api/search?q={termo}&city={cidade}&state={uf}
+ * Endpoint: GET /api/search?q={termo}&city={cidade}&state={uf}&locationKey={localidade}
  *
  * Esta API busca produtos em todos os mercados suportados para a localidade
  * informada. Os resultados sao cacheados por 15 minutos e requests iguais em
@@ -18,6 +18,7 @@ import { scrapeSamsClub } from "@/lib/scrapers/samsclub"
 import { scrapeTauste } from "@/lib/scrapers/tauste"
 import { scrapeConfianca } from "@/lib/scrapers/confianca"
 import { scrapeAtacadao } from "@/lib/scrapers/atacadao"
+import { scrapeOba } from "@/lib/scrapers/oba"
 import { recordSearchMetric, summarizeSearchResults, type ScraperMetricInput } from "@/lib/metrics/service"
 import logger from "@/lib/scrapers/logger"
 import { MARKETS, type MarketResult, type ScraperContext, type SearchResponse } from "@/lib/scrapers/types"
@@ -37,6 +38,7 @@ type SearchExecution = {
 
 const scrapers: Array<{ marketId: string; fn: ScraperFn }> = [
   { marketId: "barracao", fn: scrapeBarracao },
+  { marketId: "oba", fn: scrapeOba },
   { marketId: "tenda", fn: scrapeTenda },
   { marketId: "samsclub", fn: scrapeSamsClub },
   { marketId: "tauste", fn: scrapeTauste },
@@ -49,6 +51,7 @@ export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get("q")?.trim()
   const city = request.nextUrl.searchParams.get("city")?.trim() || "Bauru"
   const state = request.nextUrl.searchParams.get("state")?.trim().toUpperCase() || "SP"
+  const locationKey = request.nextUrl.searchParams.get("locationKey")?.trim() || undefined
 
   if (!query || query.length < 3) {
     logger.warn("API", "Busca muito curta", { query })
@@ -80,8 +83,8 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const region = resolveSearchRegion({ city, state })
-  const cacheKey = `${query.toLowerCase()}|${region.normalizedCity}|${region.normalizedState}`
+  const region = resolveSearchRegion({ key: locationKey, city, state })
+  const cacheKey = `${query.toLowerCase()}|${region.key}`
   const cached = cache.get(cacheKey)
 
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {

@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.3.0] - 2026-04-06
+
+### Adicionado
+
+- Novo scraper do Oba Hortifruti em [lib/scrapers/oba.ts](lib/scrapers/oba.ts)
+- Base com 72 localidades do Oba Delivery em [lib/oba-locations.ts](lib/oba-locations.ts)
+- Suporte a `locationKey` na interface e na API para diferenciar lojas da mesma cidade
+- Integração do Oba na lista oficial de mercados em [lib/scrapers/types.ts](lib/scrapers/types.ts)
+
+### Alterado
+
+- A API de busca passou a resolver a região por cidade e a usar uma loja de referência interna quando houver várias unidades
+- A chave de cache continua baseada no identificador técnico da cidade selecionada
+- [lib/regions.ts](lib/regions.ts) passou a agrupar as 72 localidades do Oba por cidade para evitar poluição visual
+- O README foi atualizado para refletir a nova cobertura regional e o novo scraper
+
 ## [1.2.0] - 2026-04-02
 
 ### Adicionado
@@ -17,8 +33,8 @@
 ### Alterado
 
 - A API de busca agora registra automaticamente cada execução e cada scraper no banco de métricas
-- O projeto agora usa a versão `1.2.0`
-- O `.gitignore` foi corrigido e passou a ignorar a pasta local `data/`
+- O projeto passou a usar a versão `1.2.0`
+- O `.gitignore` foi ajustado para ignorar a pasta local `data/`
 
 ### Observações
 
@@ -40,25 +56,16 @@
 
 ### Alterado
 
-- A busca da API agora considera `query + cidade + estado` no cache
-- Os mercados são filtrados antes da execução com base na localidade suportada
-- Requisições idênticas em andamento agora são deduplicadas
+- A busca da API passou a considerar `query + cidade + estado` no cache
+- Os mercados passaram a ser filtrados antes da execução com base na localidade suportada
+- Requisições idênticas em andamento passaram a ser deduplicadas
 - Cada scraper passou a aceitar contexto regional
-- O scraper do Atacadão agora usa o CEP de referência vindo da região
-- O scraper do Barracão passou a usar o catálogo real da loja em `filial/1` e `centro_distribuicao/1`
-- A home agora exibe a região da busca e mensagens de cobertura
-- Bauru/SP agora inclui o Barracão entre os mercados consultados
-- Jaú/SP, Pederneiras/SP, Potunduva/SP e Arealva/SP passaram a aparecer como localidades suportadas para o Barracão
+- O scraper do Atacadão passou a usar o CEP de referência vindo da região
+- A home passou a exibir a região da busca e mensagens de cobertura
+- Bauru/SP passou a incluir o Barracão entre os mercados consultados
 
 ### Performance
 
 - Adicionado timeout por mercado na API para evitar esperas excessivas
 - A busca não dispara scrapers para regiões sem cobertura ativa
 - Requisições repetidas para a mesma busca e região reaproveitam a mesma execução em andamento
-
-### Observações
-
-- A arquitetura já está pronta para expansão nacional
-- A cobertura ativa agora depende da combinação entre cidade e mercados habilitados
-- Novas cidades podem ser habilitadas adicionando localidades suportadas e evoluindo os scrapers correspondentes
-- Nos testes atuais do Barracão, o mesmo catálogo e os mesmos preços responderam para os CEPs de Bauru, Jaú, Pederneiras e Arealva

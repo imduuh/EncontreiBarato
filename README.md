@@ -1,19 +1,19 @@
 # Encontrei Barato
 
-Comparador de preços entre mercados, com foco em busca rápida de produtos, consolidação visual por loja e suporte a preços promocionais por quantidade.
+Comparador de preços entre mercados, com foco em busca rápida de produtos, consolidação visual por loja e suporte à regionalização por cidade e estado.
 
-O projeto nasceu com um recorte inicial regional, mas a proposta do produto é evoluir para um comparador escalável para o Brasil todo, respeitando disponibilidade, cidade, CEP de referência, seller e regras específicas de cada mercado.
+O projeto nasceu com um recorte regional, mas a arquitetura foi evoluída para suportar múltiplas cidades, lojas e contextos de entrega sem depender de uma única configuração fixa.
 
 ## Visualização Online
 
-O Encontrei Barato está disponível online para visualização e testes em produção:
+O Encontrei Barato está online para visualização e testes em produção:
 
 [encontreibarato.com.br](https://encontreibarato.com.br)
 
 ## Versão Atual
 
-- Versão: `1.2.0`
-- Última release documentada: `2026-04-01`
+- Versão: `1.3.0`
+- Última release documentada: `2026-04-06`
 - Histórico completo: [CHANGELOG.md](CHANGELOG.md)
 
 ## Visão Geral
@@ -23,6 +23,7 @@ O Encontrei Barato foi construído para resolver um problema simples: pesquisar 
 Hoje o sistema consulta:
 
 - Barracão
+- Oba Hortifruti
 - Tenda Atacado
 - Sam's Club
 - Tauste
@@ -31,7 +32,7 @@ Hoje o sistema consulta:
 
 Cada mercado tem um scraper próprio, porque cada site usa estrutura, API, HTML, sessão e regras diferentes.
 
-## O que o Projeto Faz
+## O Que o Projeto Faz
 
 - Busca produtos em vários mercados em paralelo
 - Exibe os resultados separados por coluna de mercado
@@ -52,21 +53,24 @@ Hoje a API recebe:
 - `q`
 - `city`
 - `state`
+- `locationKey`
 
-Além disso:
+O `locationKey` hoje funciona como identificador técnico interno da cidade selecionada. Ele continua sendo usado pela API e pelo cache, mas a interface mostra apenas cidade e estado. Quando uma cidade possui várias unidades, o sistema escolhe uma loja de referência internamente para manter a busca simples.
+
+Atualmente:
 
 - a interface mostra apenas estados e cidades cadastrados em [lib/regions.ts](lib/regions.ts)
-- `Bauru/SP` permanece como localidade padrão
-- a arquitetura já está pronta para expansão para novas cidades
-- a cobertura ativa depende da combinação entre cidade e mercados habilitados
+- `Bauru/SP` fica selecionada por padrão
+- a cobertura ativa inclui as 72 localidades do Oba Delivery
+- Bauru continua habilitando também os mercados já existentes do projeto
+- a validação automatizada do Oba confirmou `regionId` em todas as 72 localidades e `seller` compatível em 68 delas; as 4 restantes ficaram com retorno ambíguo da própria API do Oba
+- as 72 localidades do Oba são agrupadas internamente por cidade para evitar poluição visual na busca
 
-Localidades atualmente habilitadas:
+Arquivos principais dessa camada:
 
-- Bauru/SP
-- Jaú/SP
-- Pederneiras/SP
-- Potunduva/SP
-- Arealva/SP
+- [lib/regions.ts](lib/regions.ts)
+- [lib/oba-locations.ts](lib/oba-locations.ts)
+- [components/search-bar.tsx](components/search-bar.tsx)
 
 ## Stack
 
@@ -75,7 +79,7 @@ Localidades atualmente habilitadas:
 - TypeScript
 - Tailwind CSS 4
 - Radix UI / componentes no estilo shadcn
-- Cheerio para parsing HTML
+- Cheerio para parsing de HTML
 - SQLite nativo do Node.js para persistência de métricas
 
 ## Estrutura do Projeto
@@ -89,7 +93,7 @@ app/
   icon.tsx                   # favicon dinâmico
 
 components/
-  search-bar.tsx             # formulário de busca
+  search-bar.tsx             # formulário de busca por produto, cidade e estado
   market-column.tsx          # coluna de resultados por mercado
   ui/                        # componentes reutilizáveis de interface
 
@@ -97,27 +101,28 @@ lib/
   metrics/
     db.ts                    # inicialização do SQLite
     service.ts               # gravação e agregação das métricas
-  regions.ts                 # localidades suportadas e contexto regional
+  oba-locations.ts           # 72 localidades internas do Oba
+  regions.ts                 # agrupamento por cidade e contexto regional
   scrapers/
     atacadao.ts
     barracao.ts
     confianca.ts
+    oba.ts
     samsclub.ts
     tauste.ts
     tenda.ts
     logger.ts
     types.ts
-  utils.ts
 
 proxy.ts                     # proteção da área administrativa
 ```
 
 ## Como Funciona a Busca
 
-1. O usuário informa um produto, cidade e estado na página inicial.
-2. A interface chama `GET /api/search?q=...&city=...&state=...`.
-3. A API valida o termo e resolve a região em [lib/regions.ts](lib/regions.ts).
-4. A API verifica cache por `query + cidade + estado`.
+1. O usuário informa um produto, escolhe a cidade e o estado na página inicial.
+2. A interface chama `GET /api/search?q=...&city=...&state=...&locationKey=...`.
+3. A API resolve a cidade em [lib/regions.ts](lib/regions.ts) e seleciona uma loja de referência quando necessário.
+4. A API verifica cache por `query + locationKey`.
 5. Se não houver cache válido, apenas os scrapers habilitados para aquela localidade são executados.
 6. Os mercados são consultados em paralelo com `Promise.allSettled`.
 7. Cada scraper transforma o retorno do mercado em um formato comum.
@@ -129,7 +134,7 @@ proxy.ts                     # proteção da área administrativa
 Endpoint:
 
 ```http
-GET /api/search?q=nutella%20650g&city=Bauru&state=SP
+GET /api/search?q=banana&city=Bauru&state=SP&locationKey=bauru-vila-aviacao-sp
 ```
 
 Arquivo:
@@ -138,7 +143,7 @@ Arquivo:
 
 ### Regras da API
 
-- aceita os parâmetros `q`, `city` e `state`
+- aceita os parâmetros `q`, `city`, `state` e `locationKey`
 - exige mínimo de 3 caracteres em `q`
 - aceita no máximo 100 caracteres
 - faz cache em memória por 15 minutos
@@ -201,6 +206,8 @@ ADMIN_METRICS_PASSWORD=troque-por-uma-senha-forte
 METRICS_SQLITE_PATH=./data/metrics.sqlite
 ```
 
+Sempre reinicie o servidor depois de criar ou alterar o `.env.local`.
+
 ## Como os Scrapers Funcionam
 
 Cada mercado tem um arquivo próprio em [lib/scrapers](lib/scrapers).
@@ -209,8 +216,18 @@ O objetivo de cada scraper é sempre o mesmo:
 
 - buscar produtos no mercado
 - extrair nome, imagem, URL e preço
-- detectar promoções por quantidade
+- detectar promoções por quantidade quando disponíveis
 - devolver tudo no formato `MarketProduct[]`
+
+### Oba Hortifruti
+
+[lib/scrapers/oba.ts](lib/scrapers/oba.ts)
+
+- resolve a regionalização pela API VTEX de `regions`
+- monta o cookie `vtex_segment` com o `regionId` da cidade selecionada
+- consulta o endpoint de `intelligent-search` usando `query=...`
+- usa uma loja de referência interna para cidades com múltiplas unidades
+- cobre as 72 localidades cadastradas em [lib/oba-locations.ts](lib/oba-locations.ts), agrupadas na interface por cidade
 
 ### Barracão
 
@@ -258,110 +275,10 @@ O objetivo de cada scraper é sempre o mesmo:
 [lib/scrapers/confianca.ts](lib/scrapers/confianca.ts)
 
 - usa Oracle Commerce Cloud
-- normaliza a resposta para o formato unificado do projeto
+- combina parsing de listagem e normalização de preço
 
-## Logs e Observabilidade
+## Observações
 
-Os logs estão centralizados em:
-
-[lib/scrapers/logger.ts](lib/scrapers/logger.ts)
-
-Tipos de log usados no projeto:
-
-- `info`
-- `success`
-- `warn`
-- `error`
-- `debug`
-- `request`
-- `response`
-
-Isso ajuda bastante a identificar:
-
-- mudanças de layout nos mercados
-- erros de parse
-- problemas de disponibilidade regional
-- divergências entre busca e página do produto
-
-## Interface
-
-Os principais componentes visuais são:
-
-- [app/page.tsx](app/page.tsx)
-- [components/search-bar.tsx](components/search-bar.tsx)
-- [components/market-column.tsx](components/market-column.tsx)
-
-Recursos da UI:
-
-- busca centralizada no header
-- seleção de estado e cidade a partir das localidades suportadas
-- Bauru como localidade padrão
-- colunas por mercado com layout escalável
-- destaque do menor preço global
-- exibição de preço de atacado em separado
-- filtro para produtos indisponíveis
-
-## Instalação
-
-### Requisitos
-
-- Node.js 22 ou superior
-- npm
-
-### Passo a Passo
-
-```bash
-git clone https://github.com/imduuh/EncontreiBarato.git
-cd encontreibarato
-npm install
-cp .env.example .env.local
-```
-
-Depois configure suas credenciais da área administrativa em `.env.local`.
-
-Observação:
-
-- o arquivo precisa existir na raiz do projeto
-- após criar ou alterar `.env.local`, reinicie o servidor `npm run dev`
-
-### Rodando em Desenvolvimento
-
-```bash
-npm run dev
-```
-
-Depois abra:
-
-[http://localhost:3000](http://localhost:3000)
-
-### Build de Produção
-
-```bash
-npm run build
-npm run start
-```
-
-## Contribuindo
-
-Contribuições são bem-vindas, principalmente em:
-
-- manutenção e ajustes dos scrapers
-- tratamento de disponibilidade por região
-- melhorias de interface
-- aumento de resiliência contra mudanças de HTML
-- melhorias de performance e cache
-- melhorias na observabilidade
-- expansão do projeto para novas cidades, regiões e mercados
-
-## Limites e Observações Importantes
-
-- os mercados podem mudar HTML, endpoints e regras a qualquer momento
-- disponibilidade e preço podem variar por cidade, CEP, loja, seller e sessão
-- o projeto depende de scraping e integrações não oficiais
-- parte dos dados pode ficar temporariamente inconsistente quando o mercado diverge entre busca e PDP
-- o cache em memória é local ao processo e não compartilhado entre instâncias
-- o banco de métricas em SQLite é local à instância em execução
-
-## Licença
-
-Este projeto utiliza a licença presente no repositório.
+- O SQLite de métricas funciona muito bem em ambiente local e self-hosted.
+- Em ambiente serverless, a persistência local depende do provedor e pode não ser durável entre instâncias.
+- A cobertura geográfica do projeto cresce conforme novas localidades e novos scrapers são validados.
