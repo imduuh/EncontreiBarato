@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { resolveSearchRegion } from "@/lib/regions"
 import { scrapeBarracao } from "@/lib/scrapers/barracao"
+import { scrapeSanMichel } from "@/lib/scrapers/sanmichel"
 import { scrapeTenda } from "@/lib/scrapers/tenda"
 import { scrapeSamsClub } from "@/lib/scrapers/samsclub"
 import { scrapeTauste } from "@/lib/scrapers/tauste"
@@ -23,8 +24,14 @@ import { recordSearchMetric, summarizeSearchResults, type ScraperMetricInput } f
 import logger from "@/lib/scrapers/logger"
 import { MARKETS, type MarketResult, type ScraperContext, type SearchResponse } from "@/lib/scrapers/types"
 
-const cache = new Map<string, { data: SearchResponse; timestamp: number }>()
+type CacheEntry = {
+  data: SearchResponse
+  timestamp: number
+}
+
+const cache = new Map<string, CacheEntry>()
 const inFlightRequests = new Map<string, Promise<SearchExecution>>()
+const marketsById = new Map(MARKETS.map((market) => [market.id, market]))
 
 const CACHE_TTL = 15 * 60 * 1000
 const MAX_CACHE_ENTRIES = 100
@@ -37,6 +44,7 @@ type SearchExecution = {
 }
 
 const scrapers: Array<{ marketId: string; fn: ScraperFn }> = [
+  { marketId: "sanmichel", fn: scrapeSanMichel },
   { marketId: "barracao", fn: scrapeBarracao },
   { marketId: "oba", fn: scrapeOba },
   { marketId: "tenda", fn: scrapeTenda },
@@ -85,11 +93,10 @@ export async function GET(request: NextRequest) {
 
   const region = resolveSearchRegion({ key: locationKey, city, state })
   const cacheKey = `${query.toLowerCase()}|${region.key}`
-  const cached = cache.get(cacheKey)
-
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+  const cached = getCachedResponse(cacheKey)
+  if (cached) {
     logger.info("API", "Retornando resultado do cache", { query, region: region.label })
-    const cachedSummary = summarizeSearchResults(cached.data.results)
+    const cachedSummary = summarizeSearchResults(cached.results)
     recordSearchMetric({
       query,
       city,
@@ -105,7 +112,7 @@ export async function GET(request: NextRequest) {
       cacheMiss: false,
       inFlightReused: false,
     })
-    return NextResponse.json(cached.data)
+    return NextResponse.json(cached)
   }
 
   const existingRequest = inFlightRequests.get(cacheKey)
@@ -137,8 +144,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const execution = await searchPromise
-    cache.set(cacheKey, { data: execution.response, timestamp: Date.now() })
-    pruneCache()
+    setCachedResponse(cacheKey, execution.response)
     const summary = summarizeSearchResults(execution.response.results)
     recordSearchMetric({
       query,
@@ -188,7 +194,7 @@ async function buildSearchExecution(
 
   const settledResults = await Promise.allSettled(
     enabledScrapers.map(async ({ marketId, fn }) => {
-      const market = MARKETS.find((entry) => entry.id === marketId)!
+      const market = marketsById.get(marketId)!
       const scraperStartedAt = performance.now()
 
       try {
@@ -240,7 +246,7 @@ async function buildSearchExecution(
       return result.value
     }
 
-    const market = MARKETS.find((entry) => entry.id === enabledScrapers[index].marketId)!
+    const market = marketsById.get(enabledScrapers[index].marketId)!
     return {
       market,
       products: [],
@@ -282,10 +288,6 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: s
 }
 
 function pruneCache() {
-  if (cache.size <= MAX_CACHE_ENTRIES) {
-    return
-  }
-
   const now = Date.now()
   for (const [key, value] of cache) {
     if (now - value.timestamp > CACHE_TTL) {
@@ -293,5 +295,39 @@ function pruneCache() {
     }
   }
 
+  while (cache.size > MAX_CACHE_ENTRIES) {
+    const oldestKey = cache.keys().next().value as string | undefined
+    if (!oldestKey) {
+      break
+    }
+
+    cache.delete(oldestKey)
+  }
+
   logger.debug("API", "Cache limpo", { novoTamanho: cache.size })
+}
+
+function getCachedResponse(key: string): SearchResponse | null {
+  const entry = cache.get(key)
+  if (!entry) {
+    return null
+  }
+
+  if (Date.now() - entry.timestamp >= CACHE_TTL) {
+    cache.delete(key)
+    return null
+  }
+
+  cache.delete(key)
+  cache.set(key, entry)
+  return entry.data
+}
+
+function setCachedResponse(key: string, data: SearchResponse) {
+  cache.delete(key)
+  cache.set(key, {
+    data,
+    timestamp: Date.now(),
+  })
+  pruneCache()
 }

@@ -1,204 +1,135 @@
 # Encontrei Barato
 
-Comparador de preços entre mercados, com foco em busca rápida de produtos, consolidação visual por loja e suporte à regionalização por cidade e estado.
+Comparador de preços entre mercados, com foco em busca rápida, comparação visual por loja e suporte à regionalização por cidade e estado.
 
-O projeto nasceu com um recorte regional, mas a arquitetura foi evoluída para suportar múltiplas cidades, lojas e contextos de entrega sem depender de uma única configuração fixa.
+## Visualização online
 
-## Visualização Online
+O projeto está em produção em:
 
-O Encontrei Barato está online para visualização e testes em produção:
+- [encontreibarato.com.br](https://encontreibarato.com.br)
 
-[encontreibarato.com.br](https://encontreibarato.com.br)
+## Versão atual
 
-## Versão Atual
+- Versão: `1.5.0`
+- Última atualização documentada: `2026-04-23`
+- Histórico completo: [CHANGELOG.md](./CHANGELOG.md)
 
-- Versão: `1.3.0`
-- Última release documentada: `2026-04-06`
-- Histórico completo: [CHANGELOG.md](CHANGELOG.md)
+## O que o projeto faz
 
-## Visão Geral
+- pesquisa um produto em vários mercados ao mesmo tempo
+- organiza os resultados por mercado
+- destaca comparações de preço entre lojas
+- exibe promoções por quantidade quando disponíveis
+- permite ordenar os produtos por nome e preço
+- aplica cache e deduplicação para evitar requisições repetidas
+- registra métricas operacionais em SQLite
+- disponibiliza um painel administrativo privado para acompanhamento
 
-O Encontrei Barato foi construído para resolver um problema simples: pesquisar um produto uma vez e comparar, em poucos segundos, quanto ele custa em diferentes mercados.
+## Interface
 
-Hoje o sistema consulta:
+As atualizações mais recentes da interface incluem:
 
-- Barracão
-- Oba Hortifruti
-- Tenda Atacado
-- Sam's Club
-- Tauste
-- Confiança
+- visual mais escuro e moderno
+- barra de busca centralizada como foco principal da home
+- cards dos mercados redesenhados
+- bloco de comparação com nova hierarquia visual
+- modal de doação alinhado ao novo visual
+- filtro de ordenação por:
+  - menor preço
+  - maior preço
+  - nome A-Z
+  - nome Z-A
+
+## Mercados integrados
+
 - Atacadão
+- Barracão
+- Confiança
+- Oba Hortifruti
+- Sam's Club
+- San Michel
+- Tauste
+- Tenda Atacado
 
-Cada mercado tem um scraper próprio, porque cada site usa estrutura, API, HTML, sessão e regras diferentes.
+## Cobertura regional
 
-## O Que o Projeto Faz
+Hoje a busca funciona por `cidade` e `estado`.
 
-- Busca produtos em vários mercados em paralelo
-- Exibe os resultados separados por coluna de mercado
-- Destaca o menor preço encontrado para cada produto equivalente
-- Mostra preços promocionais por quantidade quando disponíveis
-- Permite ocultar produtos indisponíveis na interface
-- Usa cache em memória para reduzir repetição de requisições
-- Deduplica buscas idênticas em andamento
-- Aplica timeout por mercado para evitar esperas excessivas
-- Mantém logs detalhados para diagnóstico dos scrapers
-- Registra métricas de latência, cache, throughput e saúde dos scrapers em SQLite
-- Disponibiliza um dashboard privado para acompanhamento operacional
+- a interface mostra apenas localidades cadastradas em `lib/regions.ts`
+- `Bauru/SP` continua como seleção padrão
+- cidades com múltiplas unidades usam uma loja de referência interna
+- o Oba já conta com agrupamento por cidade para evitar excesso de opções na interface
 
-## Busca Regional
-
-Hoje a API recebe:
-
-- `q`
-- `city`
-- `state`
-- `locationKey`
-
-O `locationKey` hoje funciona como identificador técnico interno da cidade selecionada. Ele continua sendo usado pela API e pelo cache, mas a interface mostra apenas cidade e estado. Quando uma cidade possui várias unidades, o sistema escolhe uma loja de referência internamente para manter a busca simples.
-
-Atualmente:
-
-- a interface mostra apenas estados e cidades cadastrados em [lib/regions.ts](lib/regions.ts)
-- `Bauru/SP` fica selecionada por padrão
-- a cobertura ativa inclui as 72 localidades do Oba Delivery
-- Bauru continua habilitando também os mercados já existentes do projeto
-- a validação automatizada do Oba confirmou `regionId` em todas as 72 localidades e `seller` compatível em 68 delas; as 4 restantes ficaram com retorno ambíguo da própria API do Oba
-- as 72 localidades do Oba são agrupadas internamente por cidade para evitar poluição visual na busca
-
-Arquivos principais dessa camada:
-
-- [lib/regions.ts](lib/regions.ts)
-- [lib/oba-locations.ts](lib/oba-locations.ts)
-- [components/search-bar.tsx](components/search-bar.tsx)
-
-## Stack
+## Stack principal
 
 - Next.js 16
 - React 19
 - TypeScript
 - Tailwind CSS 4
-- Radix UI / componentes no estilo shadcn
-- Cheerio para parsing de HTML
-- SQLite nativo do Node.js para persistência de métricas
+- Radix UI
+- Cheerio
+- SQLite nativo do Node.js
 
-## Estrutura do Projeto
+## Estrutura resumida
 
 ```text
 app/
-  admin/metrics/page.tsx     # dashboard privado de métricas
-  api/search/route.ts        # API principal de busca
-  layout.tsx                 # layout global
-  page.tsx                   # página inicial
-  icon.tsx                   # favicon dinâmico
+  admin/metrics/page.tsx   # dashboard privado de métricas
+  api/search/route.ts      # API principal de busca
+  layout.tsx               # layout global
+  page.tsx                 # página inicial
 
 components/
-  search-bar.tsx             # formulário de busca por produto, cidade e estado
-  market-column.tsx          # coluna de resultados por mercado
-  ui/                        # componentes reutilizáveis de interface
+  market-column.tsx
+  search-bar.tsx
+  ui/
+
+docs/
+  scrapers/                # documentação detalhada por mercado
 
 lib/
   metrics/
-    db.ts                    # inicialização do SQLite
-    service.ts               # gravação e agregação das métricas
-  oba-locations.ts           # 72 localidades internas do Oba
-  regions.ts                 # agrupamento por cidade e contexto regional
+  regions.ts
+  oba-locations.ts
   scrapers/
-    atacadao.ts
-    barracao.ts
-    confianca.ts
-    oba.ts
-    samsclub.ts
-    tauste.ts
-    tenda.ts
-    logger.ts
-    types.ts
 
-proxy.ts                     # proteção da área administrativa
+public/
+  images/
+  markets/
 ```
 
-## Como Funciona a Busca
+## Como clonar e rodar localmente
 
-1. O usuário informa um produto, escolhe a cidade e o estado na página inicial.
-2. A interface chama `GET /api/search?q=...&city=...&state=...&locationKey=...`.
-3. A API resolve a cidade em [lib/regions.ts](lib/regions.ts) e seleciona uma loja de referência quando necessário.
-4. A API verifica cache por `query + locationKey`.
-5. Se não houver cache válido, apenas os scrapers habilitados para aquela localidade são executados.
-6. Os mercados são consultados em paralelo com `Promise.allSettled`.
-7. Cada scraper transforma o retorno do mercado em um formato comum.
-8. A API agrega os resultados, registra as métricas e devolve uma resposta única.
-9. A interface renderiza os produtos por mercado e destaca os melhores preços.
+### 1. Clonar o repositório
 
-## API Principal
-
-Endpoint:
-
-```http
-GET /api/search?q=banana&city=Bauru&state=SP&locationKey=bauru-vila-aviacao-sp
+```bash
+git clone https://github.com/imduuh/EncontreiBarato.git
+cd EncontreiBarato/encontreibarato
 ```
 
-Arquivo:
+### 2. Instalar as dependências
 
-[app/api/search/route.ts](app/api/search/route.ts)
+```bash
+npm install
+```
 
-### Regras da API
+### 3. Configurar as variáveis de ambiente
 
-- aceita os parâmetros `q`, `city`, `state` e `locationKey`
-- exige mínimo de 3 caracteres em `q`
-- aceita no máximo 100 caracteres
-- faz cache em memória por 15 minutos
-- deduplica buscas idênticas em andamento
-- executa os mercados habilitados em paralelo
-- aplica timeout por mercado
-- registra métricas operacionais em SQLite
-- a falha de um mercado não derruba os outros
+Copie o arquivo de exemplo:
 
-## Métricas e Dashboard Admin
+```bash
+cp .env.example .env.local
+```
 
-O projeto possui um painel administrativo privado em:
+No Windows PowerShell, você pode usar:
 
-- `/admin/metrics`
+```powershell
+Copy-Item .env.example .env.local
+```
 
-Esse painel exibe:
+Depois ajuste as credenciais da área administrativa em `.env.local`.
 
-- `p50`, `p90`, `p95` e `p99` de latência
-- latência média, mínima e máxima
-- `RPS` dos últimos 5 e 60 minutos
-- `cache hit rate` e `cache miss rate`
-- total de buscas
-- taxa de sucesso da API
-- volume de regiões sem cobertura
-- métricas por mercado:
-  - taxa de sucesso
-  - taxa de erro
-  - taxa de timeout
-  - latência média
-  - `p95`
-  - `p99`
-  - média de produtos retornados
-
-### Segurança
-
-A área administrativa é protegida por autenticação básica via variáveis de ambiente:
-
-- `ADMIN_METRICS_USERNAME`
-- `ADMIN_METRICS_PASSWORD`
-
-### Persistência
-
-As métricas são armazenadas em SQLite local, por padrão em:
-
-- `./data/metrics.sqlite`
-
-Esse arquivo:
-
-- não deve ser versionado
-- não fica exposto publicamente
-- é ignorado pelo Git em [/.gitignore](.gitignore)
-
-## Variáveis de Ambiente
-
-Exemplo em [.env.example](.env.example):
+Exemplo:
 
 ```env
 ADMIN_METRICS_USERNAME=admin
@@ -208,77 +139,99 @@ METRICS_SQLITE_PATH=./data/metrics.sqlite
 
 Sempre reinicie o servidor depois de criar ou alterar o `.env.local`.
 
-## Como os Scrapers Funcionam
+### 4. Iniciar o ambiente de desenvolvimento
 
-Cada mercado tem um arquivo próprio em [lib/scrapers](lib/scrapers).
+```bash
+npm run dev
+```
 
-O objetivo de cada scraper é sempre o mesmo:
+### 5. Abrir no navegador
 
-- buscar produtos no mercado
-- extrair nome, imagem, URL e preço
-- detectar promoções por quantidade quando disponíveis
-- devolver tudo no formato `MarketProduct[]`
+- Aplicação: [http://localhost:3000](http://localhost:3000)
+- Admin de métricas: [http://localhost:3000/admin/metrics](http://localhost:3000/admin/metrics)
 
-### Oba Hortifruti
+## Scripts disponíveis
 
-[lib/scrapers/oba.ts](lib/scrapers/oba.ts)
+- `npm run dev` inicia o ambiente de desenvolvimento
+- `npm run build` gera a build de produção
+- `npm run start` inicia a aplicação em modo produção
+- `npm run lint` executa a checagem de lint
 
-- resolve a regionalização pela API VTEX de `regions`
-- monta o cookie `vtex_segment` com o `regionId` da cidade selecionada
-- consulta o endpoint de `intelligent-search` usando `query=...`
-- usa uma loja de referência interna para cidades com múltiplas unidades
-- cobre as 72 localidades cadastradas em [lib/oba-locations.ts](lib/oba-locations.ts), agrupadas na interface por cidade
+## Como a busca funciona
 
-### Barracão
+1. O usuário informa o produto e escolhe cidade e estado.
+2. A interface chama `GET /api/search`.
+3. A API resolve a localidade em `lib/regions.ts`.
+4. O sistema verifica cache por busca e região.
+5. Apenas os mercados habilitados para aquela região são executados.
+6. Os scrapers rodam em paralelo.
+7. A API normaliza a resposta, registra métricas e devolve os resultados.
 
-[lib/scrapers/barracao.ts](lib/scrapers/barracao.ts)
+## API principal
 
-- usa o catálogo real da loja via `filial/1` e `centro_distribuicao/1`
-- interpreta preços promocionais a partir de `oferta.preco_oferta`
-- monta URLs de produto no formato `/produto/{produto_id}/{slug}`
-- usa imagens hospedadas no bucket de assets da plataforma
+Endpoint de exemplo:
 
-### Atacadão
+```http
+GET /api/search?q=banana&city=Bauru&state=SP
+```
 
-[lib/scrapers/atacadao.ts](lib/scrapers/atacadao.ts)
+Regras principais:
 
-- usa sessão VTEX com CEP configurado
-- tenta busca por APIs VTEX
-- interpreta `commertialOffer`, `Teasers` e blocos da página do produto
-- faz enriquecimento adicional para detectar preço por quantidade quando necessário
-- exige cuidado com disponibilidade regional, seller e sessão
+- aceita `q`, `city`, `state` e, quando necessário, `locationKey`
+- exige no mínimo 3 caracteres em `q`
+- limita a busca a 100 caracteres
+- usa cache em memória por 15 minutos
+- deduplica buscas idênticas em andamento
+- aplica timeout por mercado
+- mantém a API funcional mesmo quando um mercado falha
 
-### Tenda
+## Métricas e área administrativa
 
-[lib/scrapers/tenda.ts](lib/scrapers/tenda.ts)
+O painel privado em `/admin/metrics` mostra:
 
-- busca em página com forte uso de JavaScript
-- tenta extrair JSON embutido no HTML
-- faz fallback para parse estrutural da página
+- latência com `p50`, `p90`, `p95` e `p99`
+- latência média, mínima e máxima
+- `RPS` recente
+- `cache hit rate` e `cache miss rate`
+- total de buscas
+- taxa de sucesso da API
+- métricas por mercado, incluindo erro, timeout e volume médio de produtos
 
-### Sam's Club
+### Segurança
 
-[lib/scrapers/samsclub.ts](lib/scrapers/samsclub.ts)
+O acesso à área administrativa é protegido por autenticação básica usando:
 
-- parsing adaptado ao formato do site
-- suporte a preço base quando a fonte expõe esse dado
+- `ADMIN_METRICS_USERNAME`
+- `ADMIN_METRICS_PASSWORD`
 
-### Tauste
+### Persistência
 
-[lib/scrapers/tauste.ts](lib/scrapers/tauste.ts)
+As métricas são salvas em SQLite local, por padrão em:
 
-- parse de cards Magento 2
-- usa seletores HTML e atributos de preço como fonte principal
+- `./data/metrics.sqlite`
 
-### Confiança
+Esse arquivo:
 
-[lib/scrapers/confianca.ts](lib/scrapers/confianca.ts)
+- não deve ser versionado
+- não é exposto publicamente
+- é ignorado pelo Git
 
-- usa Oracle Commerce Cloud
-- combina parsing de listagem e normalização de preço
+## Documentação dos scrapers
+
+O README principal fica focado em uso, setup e arquitetura geral. O detalhamento de cada integração está em arquivos dedicados:
+
+- [Visão geral dos scrapers](./docs/scrapers/README.md)
+- [Atacadão](./docs/scrapers/atacadao.md)
+- [Barracão](./docs/scrapers/barracao.md)
+- [Confiança](./docs/scrapers/confianca.md)
+- [Oba Hortifruti](./docs/scrapers/oba.md)
+- [Sam's Club](./docs/scrapers/samsclub.md)
+- [San Michel](./docs/scrapers/sanmichel.md)
+- [Tauste](./docs/scrapers/tauste.md)
+- [Tenda Atacado](./docs/scrapers/tenda.md)
 
 ## Observações
 
-- O SQLite de métricas funciona muito bem em ambiente local e self-hosted.
-- Em ambiente serverless, a persistência local depende do provedor e pode não ser durável entre instâncias.
-- A cobertura geográfica do projeto cresce conforme novas localidades e novos scrapers são validados.
+- SQLite funciona muito bem localmente e em ambientes self-hosted.
+- Em ambiente serverless, a persistência local pode não ser durável entre instâncias.
+- A cobertura geográfica cresce conforme novos mercados e localidades são validados.

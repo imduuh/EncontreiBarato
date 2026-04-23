@@ -1,6 +1,7 @@
 import chalk from "chalk"
 
 const MARKET_COLORS: Record<string, (text: string) => string> = {
+  sanmichel: chalk.hex("#0F8D35"),
   barracao: chalk.hex("#16833B"),
   oba: chalk.hex("#42873E"),
   tenda: chalk.red,

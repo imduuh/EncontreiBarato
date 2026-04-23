@@ -35,6 +35,13 @@ export interface MarketInfo {
 
 export const MARKETS: MarketInfo[] = [
   {
+    id: "sanmichel",
+    name: "San Michel",
+    color: "#0F8D35",
+    url: "https://www.supersanmichel.com.br",
+    logo: "/markets/sanmichel.svg",
+  },
+  {
     id: "barracao",
     name: "Barracao",
     color: "#16833B",

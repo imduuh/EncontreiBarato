@@ -7,8 +7,8 @@ import {
   type VipCommerceMarketConfig,
 } from "./vipcommerce"
 
-const MARKET_NAME = "Barracao"
-const HOST = "barracaosm.com.br"
+const MARKET_NAME = "SanMichel"
+const HOST = "supersanmichel.com.br"
 const AUTH_KEY = "df072f85df9bf7dd71b6811c34bdbaa4f219d98775b56cff9dfa5f8ca1bf8469"
 const MAX_PRODUCTS = 10
 
@@ -18,24 +18,19 @@ const MARKET_CONFIG: VipCommerceMarketConfig = {
   authKey: AUTH_KEY,
   defaultStorefrontFilialId: 1,
   defaultDistributionCenterId: 1,
+  vipcommerceFilialId: 316,
+  sendFilialHeader: true,
 }
 
-export async function scrapeBarracao(
+export async function scrapeSanMichel(
   query: string,
   context?: ScraperContext
 ): Promise<MarketProduct[]> {
-  const referenceCep = context?.region.referenceCep
-
   logger.info(MARKET_NAME, "Iniciando busca", {
     query,
     region: context?.region.label,
-    referenceCep,
+    referenceCep: context?.region.referenceCep,
   })
-
-  if (!referenceCep) {
-    logger.warn(MARKET_NAME, "Busca ignorada por falta de CEP de referencia")
-    return []
-  }
 
   const session = await getVipCommerceSession(MARKET_CONFIG)
   const products = (await searchVipCommerceProducts(MARKET_CONFIG, session, query))
@@ -43,11 +38,10 @@ export async function scrapeBarracao(
     .filter((product): product is MarketProduct => product !== null)
 
   if (products.length === 0) {
-    logger.warn(MARKET_NAME, "Nenhum produto retornado pelo catalogo principal", {
+    logger.warn(MARKET_NAME, "Nenhum produto retornado pela busca principal", {
       query,
       region: context?.region.label,
-      referenceCep,
-      filialId: session.storefrontFilialId,
+      storefrontFilialId: session.storefrontFilialId,
       distributionCenterId: session.distributionCenterId,
     })
     return []
@@ -55,7 +49,7 @@ export async function scrapeBarracao(
 
   logger.success(MARKET_NAME, `Encontrados ${products.length} produtos`, {
     region: context?.region.label,
-    filialId: session.storefrontFilialId,
+    storefrontFilialId: session.storefrontFilialId,
     distributionCenterId: session.distributionCenterId,
   })
 

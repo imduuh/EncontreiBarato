@@ -43,6 +43,14 @@ const CITY_REFERENCE_KEYS: Record<string, string> = {
 
 const BASE_LOCATIONS: RawLocation[] = [
   {
+    key: "pocos-de-caldas-mg",
+    label: "Poços de Caldas, MG",
+    city: "Poços de Caldas",
+    state: "MG",
+    referenceCep: "37704355",
+    enabledMarketIds: ["sanmichel"],
+  },
+  {
     key: "jau-sp",
     label: "Jau, SP",
     city: "Jau",

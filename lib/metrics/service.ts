@@ -228,7 +228,7 @@ export function getMetricsDashboard() {
     }))
     .sort((a, b) => b.averageLatencyMs - a.averageLatencyMs)
 
-  const latestRequests = requestRows.slice(0, 20).map((row) => ({
+  const latestRequests = requestRows.slice(0, 5).map((row) => ({
     createdAt: String(row.created_at),
     query: String(row.query),
     regionLabel: String(row.region_label),

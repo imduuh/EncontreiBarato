@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { MapPin, Search } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { ChevronDown, MapPin, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { getSupportedLocationsByState, getSupportedStates } from "@/lib/regions"
 
 interface SearchBarProps {
@@ -55,61 +55,78 @@ export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full max-w-2xl flex-col gap-2">
-      <div className="flex gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+    <form
+      onSubmit={handleSubmit}
+      className="w-full rounded-[1.9rem] border border-white/10 bg-slate-900/70 p-4 shadow-[0_28px_90px_-40px_rgba(0,0,0,0.9)] backdrop-blur-2xl"
+    >
+      <div className="flex flex-col gap-3">
+        <div className="relative">
+          <Search className="absolute left-5 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
           <Input
             ref={inputRef}
             type="text"
             placeholder="Buscar produto (ex: Nutella 650g)"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-11 pl-10 text-base"
+            className="h-16 rounded-[1.35rem] border-white/10 bg-white/6 pl-14 text-base text-white placeholder:text-slate-400"
             disabled={isLoading}
             autoFocus
           />
         </div>
-        <Button
-          type="submit"
-          size="lg"
-          disabled={isLoading || query.trim().length < 3 || !city}
-        >
-          {isLoading ? "Buscando..." : "Comparar"}
-        </Button>
-      </div>
 
-      <div className="grid grid-cols-[1fr_104px] gap-3">
-        <div className="relative">
-          <MapPin className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <select
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            disabled={isLoading || supportedLocations.length === 0}
-            className="h-10 w-full rounded-lg border border-input bg-transparent pl-10 pr-3 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50"
-            aria-label="Cidade"
+        <div className="grid gap-3 md:grid-cols-[1fr_112px_auto]">
+          <div className="relative">
+            <MapPin className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <select
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              disabled={isLoading || supportedLocations.length === 0}
+              className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-slate-900 pl-11 pr-10 text-sm text-white outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 [color-scheme:dark]"
+              aria-label="Cidade"
+            >
+              {supportedLocations.map((location) => (
+                <option
+                  key={location.key}
+                  value={location.city}
+                  className="bg-slate-900 text-white"
+                >
+                  {location.city}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative">
+            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <select
+              value={state}
+              onChange={(e) => setState(e.target.value)}
+              disabled={isLoading || supportedStates.length === 0}
+              className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-slate-900 px-4 pr-10 text-sm font-semibold text-white outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 [color-scheme:dark]"
+              aria-label="Estado"
+            >
+              {supportedStates.map((uf) => (
+                <option key={uf} value={uf} className="bg-slate-900 text-white">
+                  {uf}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isLoading || query.trim().length < 3 || !city}
+            className="h-12 rounded-2xl px-6 text-sm font-semibold text-slate-950 shadow-[0_18px_40px_-18px_rgba(52,211,153,0.85)]"
           >
-            {supportedLocations.map((location) => (
-              <option key={location.key} value={location.city}>
-                {location.city}
-              </option>
-            ))}
-          </select>
+            {isLoading ? "Buscando..." : "Comparar preços"}
+          </Button>
         </div>
 
-        <select
-          value={state}
-          onChange={(e) => setState(e.target.value)}
-          disabled={isLoading || supportedStates.length === 0}
-          className="h-10 rounded-lg border border-input bg-transparent px-3 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50"
-          aria-label="Estado"
-        >
-          {supportedStates.map((uf) => (
-            <option key={uf} value={uf}>
-              {uf}
-            </option>
-          ))}
-        </select>
+        <p className="px-1 text-xs text-slate-400">
+          {"Escolha sua cidade e o estado para consultar apenas os mercados compatíveis com a sua região."}
+        </p>
       </div>
     </form>
   )
